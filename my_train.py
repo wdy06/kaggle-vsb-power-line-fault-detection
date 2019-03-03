@@ -30,6 +30,9 @@ session_conf = tf.ConfigProto(intra_op_parallelism_threads=1, inter_op_paralleli
 tf.set_random_seed(1234)
 sess = tf.Session(graph=tf.get_default_graph(), config=session_conf)
 K.set_session(sess)
+torch.manual_seed(2019)
+torch.cuda.manual_seed(2019)
+torch.cuda.manual_seed_all(2019)
 torch.backends.cudnn.deterministic = True
 
 
@@ -45,29 +48,36 @@ else:
 os.mkdir(result_dir)
 print(f'created: {result_dir}')
 
-# select how many folds will be created
-N_SPLITS = 5
-epoch = 50
+
+tfconfig = tfconfig = tf.ConfigProto(
+                gpu_options=tf.GPUOptions(allow_growth=True)
+            )
+sess = tf.Session(config=tfconfig)
+K.set_session(sess)
+
+N_SPLITS = 10
+#N_SPLITS = 1
+epoch = 300
 if args.debug:
     print('running debug mode')
     epoch = 5
     
 batchsize = 128
-# it is just a constant with the measurements data size
 sample_size = 800000
-# in other notebook I have extracted the min and max values from the train data, the measurements
 max_num = 127
 min_num = -128
 #n_dim = 160
 window_size = 5000
 stride = 5000
 
+lr = 0.001
+
 dataset = VsbSignalDataset(mode='train', debug=args.debug)
 normalizer = Normalizer(min_num, max_num)
 
-X = feature_extracter.feature_extracter(feature_extracter.time_feature_extracter,
-                                        dataset, window_size=window_size, stride=stride, grouped=True, 
-                                        normalizer=normalizer)
+X = feature_extracter.feature_extracter('stats',
+                                        dataset, window_size=window_size, stride=stride,
+                                        grouped=True, normalizer=normalizer, use_cache=True)
 
 y = dataset.labels
 #y = y[::3].reshape(-1, 1)
@@ -77,32 +87,31 @@ print(X.shape, y.shape)
 np.save(os.path.join(result_dir, "X.npy"),X)
 np.save(os.path.join(result_dir, "y.npy"),X)
 
-# Here is where the training happens
 
-splits = list(StratifiedKFold(n_splits=N_SPLITS, shuffle=True, random_state=2019).split(X, y))
+#splits = list(StratifiedKFold(n_splits=N_SPLITS, shuffle=True, random_state=2019).split(X, y))
 #splits = dataset.get_folds(n_splits=N_SPLITS)
+adversarial_train_group = np.load('data/adversarial_train_group.npy')
+adversarial_val_group = np.load('data/adversarial_val_group.npy')
+splits = [(adversarial_train_group, adversarial_val_group)] * N_SPLITS
 
 preds_val = []
 y_val = []
 
 for idx, (train_idx, val_idx) in enumerate(splits):
-    K.clear_session() # I dont know what it do, but I imagine that it "clear session" :)
     print("Beginning fold {}".format(idx+1))
-    # use the indexes to extract the folds in the train and validation data
     train_X, train_y, val_X, val_y = X[train_idx], y[train_idx], X[val_idx], y[val_idx]
-    # instantiate the model for this fold
     model = modelutils.get_model('bidirectional_lstm', train_X.shape)
-    # This checkpoint helps to avoid overfitting. It just save the weights of the model if it delivered an
-    # validation matthews_correlation greater than the last one.
-    ckpt = ModelCheckpoint(os.path.join(result_dir, f'weights_{idx}.h5'), save_best_only=True, save_weights_only=True, verbose=1, monitor='val_matthews_correlation', mode='max')
+    ckpt = ModelCheckpoint(os.path.join(result_dir, f'weights_{idx}.h5'), save_best_only=True, save_weights_only=True, verbose=1, monitor='val_loss', mode='min')
+    reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=10,
+                                   verbose=1, mode='min', epsilon=0.0001)
+    early = EarlyStopping(monitor="val_loss",
+                      mode="min",
+                      patience=25)
     model.compile(loss='binary_crossentropy', optimizer='adam', metrics=[utils.matthews_correlation])
-    # Train, train, train
-    model.fit(train_X, train_y, batch_size=batchsize, epochs=epoch, validation_data=[val_X, val_y], callbacks=[ckpt])
-    # loads the best weights saved by the checkpoint
+    K.set_value(model.optimizer.lr, lr)
+    model.fit(train_X, train_y, batch_size=batchsize, epochs=epoch, validation_data=[val_X, val_y], callbacks=[ckpt, reduce_lr, early])
     model.load_weights(os.path.join(result_dir, f'weights_{idx}.h5'))
-    # Add the predictions of the validation to the list preds_val
     preds_val.append(model.predict(val_X, batch_size=512))
-    # and the val true y
     y_val.append(val_y)
 
 # concatenates all and prints the shape    
@@ -114,13 +123,14 @@ best_sarch_result = utils.threshold_search(y_val, preds_val)
 best_threshold = best_sarch_result['threshold']
 best_val_score = best_sarch_result['matthews_correlation']
 
+print(f'best threshold: {best_threshold}')
 print(f'best validation score: {best_val_score}')
 
 testdata = VsbSignalDataset(mode='test')
-X_test = feature_extracter.feature_extracter(feature_extracter.time_feature_extracter,
+X_test = feature_extracter.feature_extracter('stats',
                                              testdata, window_size=window_size,
                                              stride=stride, grouped=True, 
-                                             normalizer=normalizer)
+                                             normalizer=normalizer, use_cache=True)
 
 print(X_test.shape)
 
@@ -149,6 +159,9 @@ submission['target'] = preds_test
 submission_filename = os.path.join(result_dir, f'submission_val{best_val_score:.4f}.csv')
 submission.to_csv(submission_filename, index=False)
 print(f'save result to {submission_filename}')
+
+
+
 
 
 

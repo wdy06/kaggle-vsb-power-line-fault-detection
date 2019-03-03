@@ -16,6 +16,7 @@ from tqdm import tqdm
 import matplotlib.pyplot as plt
 import seaborn as sns
 import sys
+import os
 
 from sklearn.model_selection import train_test_split, StratifiedKFold
 
@@ -55,7 +56,29 @@ def time_feature_extracter(signal, window_size, stride):
     return feature
 
 
-def feature_extracter(extracter, dataset, window_size, stride, grouped=False, normalizer=None):
+feature_funcs = {
+    'stats': time_feature_extracter,
+    'window': window_extracter
+}
+
+def feature_extracter(feature_name, dataset, window_size, stride, grouped=False, normalizer=None, use_cache=True):
+    if grouped:
+        cache_path \
+            = f'./features/X_{dataset.mode}_group_{feature_name}_w{window_size}_s{stride}.npy'
+    else:
+        cache_path \
+            = f'./features/X_{dataset.mode}_{feature_name}_w{window_size}_s{stride}.npy'
+        
+    if use_cache:
+        print('use feature cache')
+        if os.path.exists(cache_path):
+            print('cache file found !!')
+            return np.load(cache_path)
+        else:
+            print('cache file cannot be find..')
+            
+    print('extracting feature ...')
+    extracter = feature_funcs[feature_name]
     divide_num = 12
     chunk_size = (len(dataset) // divide_num) * 3
     groups = np.unique(dataset.groups)
@@ -81,6 +104,8 @@ def feature_extracter(extracter, dataset, window_size, stride, grouped=False, no
             if grouped:
                 grouped_X = np.concatenate(grouped_X, axis=1)
                 X.append(grouped_X)
+                
+    np.save(cache_path, X)
     return np.array(X)
 
 # def feature_extracter(extracter, dataset, window_size, stride, grouped=False, normalizer=None):

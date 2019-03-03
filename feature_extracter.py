@@ -64,31 +64,18 @@ def feature_extracter(extracter, dataset, window_size, stride, grouped=False, no
     chunk_size = (len(dataset) // divide_num) * 3
     groups = np.unique(dataset.groups)
     X = []
-    #for group_indices in tqdm(np.array_split(groups, divide_num)):
     for start_index in tqdm(range(0, len(dataset), chunk_size)):
         
-        #print(group_indices)
-#         indices = []
-#         for group_id in group_indices:
-#             #print(group_id)
-#             indices.extend(list(dataset.groupid2signalid(group_id)))
-#         print(indices)
-        # load numpy array as chunk
-        #signals = dataset[indices]
         if start_index+chunk_size<=len(dataset):
             signals = dataset[start_index:start_index+chunk_size]
         else:
             signals = dataset[start_index:]
-        #print(len(signals))
-        #for i, group_id in enumerate(group_indices):
         for i in range(int(len(signals)/3)):
             grouped_X = []
             for phase in [0, 1, 2]:
                 sig = signals[i*3+phase]
-                #print(sig)
                 if normalizer is not None:
                     feature = extracter(normalizer.ts_normalize(sig), window_size, stride)
-                    #sig = normalizer.ts_normalize(sig)
                 else:
                     feature = extracter(sig, window_size, stride)
                 if grouped:

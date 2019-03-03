@@ -23,10 +23,6 @@ import utils
 from vsb_signal_dataset import VsbSignalDataset
 
 
-def ts_normalzie(signal, min_data, max_data, range_needed=(-1,1)):
-    ts_std = (signal - min_data) / (max_data - min_data)
-    return ts_std * (range_needed[1] - range_needed[0]) + range_needed[0]
-
 @jit('float32(float32[:], int32, int32)')
 def window_extracter(signal, window_size, stride):
     feature = []

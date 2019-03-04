@@ -2,10 +2,12 @@ import feather
 import pandas as pd
 import numpy as np
 import os
+import json
 import pyarrow.parquet as pq
 from tqdm import tqdm
 
 import keras.backend as K
+
 
 DIR_PATH = os.path.dirname(os.path.abspath(__file__))
 TRAIN_META = os.path.join(DIR_PATH, 'data/metadata_train.csv')
@@ -13,6 +15,7 @@ TEST_META = os.path.join(DIR_PATH, 'data/metadata_test.csv')
 TRAIN_DATA = os.path.join(DIR_PATH, 'data/train.parquet')
 TEST_DATA= os.path.join(DIR_PATH, 'data/test.parquet')
 RESULT_DIR = os.path.join(DIR_PATH, 'result')
+
 
 def load_train_meta():
     file_path = os.path.join(DIR_PATH, 'data/metadata_train.fth')
@@ -31,6 +34,14 @@ def load_test_data():
     file_path = os.path.join(DIR_PATH, 'data/test.fth')
     return feather.read_dataframe(file_path)
 
+def load_config(path):
+    with open(path, 'r') as f:
+        return json.load(f)
+    
+def save_config(config, path):
+    with open(path, 'w') as f:
+        json.dump(config, f)
+    
 def group_stratified_kfold(meta_df, n_splits=5, random_state=42):
     group_df = meta_df.groupby(['id_measurement']).sum()
     skt = StratifiedKFold(n_splits=n_splits, random_state=random_state)

@@ -6,8 +6,9 @@ os.environ['PYTHONHASHSEED'] = '0'
 np.random.seed(42)
 rn.seed(12345)
 import tensorflow as tf
-session_conf = tf.ConfigProto(intra_op_parallelism_threads=1, inter_op_parallelism_threads=1)
 tf.set_random_seed(1234)
+session_conf = tf.ConfigProto(intra_op_parallelism_threads=1, inter_op_parallelism_threads=1,
+                              gpu_options=tf.GPUOptions(allow_growth=True))
 sess = tf.Session(graph=tf.get_default_graph(), config=session_conf)
 from keras import backend as K
 K.set_session(sess)
@@ -38,6 +39,8 @@ from models import modelutils
 
 
 parser = argparse.ArgumentParser(description='vsb-power-line-fault-detection on kaggle')
+parser.add_argument('--config', '-c', type=str, default='./config/base_config.json',
+                    help='path to config file')
 parser.add_argument("--debug", help="run debug mode",
                     action="store_true")
 args = parser.parse_args()
@@ -49,36 +52,39 @@ else:
 os.mkdir(result_dir)
 print(f'created: {result_dir}')
 
+# load config
+config = utils.load_config(args.config)
 
-tfconfig = tfconfig = tf.ConfigProto(
-                gpu_options=tf.GPUOptions(allow_growth=True)
-            )
-sess = tf.Session(config=tfconfig)
-K.set_session(sess)
-
-N_SPLITS = 10
-#N_SPLITS = 1
-epoch = 300
+N_SPLITS = config['N_SPLITS']
+epoch = config['epoch']
 if args.debug:
     print('running debug mode')
     epoch = 5
     
-batchsize = 128
+batchsize = config['batch_size']
 sample_size = 800000
-max_num = 127
-min_num = -128
+max_num = config['max_num']
+min_num = config['min_num']
 #n_dim = 160
-window_size = 5000
-stride = 5000
+window_size = config['window_size']
+stride = config['stride']
+grouped = config['grouped']
+model_name = config['model_name']
+features = config['features']
 
-lr = 0.001
+lr = config['lr']
+optimizer = config['optimizer']
+loss = config['loss']
+
+# dump config
+utils.save_config(config, os.path.join(result_dir, 'config.json'))
 
 dataset = VsbSignalDataset(mode='train', debug=args.debug)
 normalizer = Normalizer(min_num, max_num)
 
-X = feature_extracter.feature_extracter('stats',
+X = feature_extracter.feature_extracter(features[0],
                                         dataset, window_size=window_size, stride=stride,
-                                        grouped=True, normalizer=normalizer, use_cache=True)
+                                        grouped=grouped, normalizer=normalizer, use_cache=True)
 
 y = dataset.labels
 #y = y[::3].reshape(-1, 1)
@@ -101,14 +107,14 @@ y_val = []
 for idx, (train_idx, val_idx) in enumerate(splits):
     print("Beginning fold {}".format(idx+1))
     train_X, train_y, val_X, val_y = X[train_idx], y[train_idx], X[val_idx], y[val_idx]
-    model = modelutils.get_model('bidirectional_lstm', train_X.shape)
+    model = modelutils.get_model(model_name, train_X.shape)
     ckpt = ModelCheckpoint(os.path.join(result_dir, f'weights_{idx}.h5'), save_best_only=True, save_weights_only=True, verbose=1, monitor='val_loss', mode='min')
     reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=10,
                                    verbose=1, mode='min', epsilon=0.0001)
     early = EarlyStopping(monitor="val_loss",
                       mode="min",
                       patience=25)
-    model.compile(loss='binary_crossentropy', optimizer='adam', metrics=[utils.matthews_correlation])
+    model.compile(loss=loss, optimizer=optimizer, metrics=[utils.matthews_correlation])
     K.set_value(model.optimizer.lr, lr)
     model.fit(train_X, train_y, batch_size=batchsize, epochs=epoch, validation_data=[val_X, val_y], callbacks=[ckpt, reduce_lr, early])
     model.load_weights(os.path.join(result_dir, f'weights_{idx}.h5'))
@@ -119,6 +125,8 @@ for idx, (train_idx, val_idx) in enumerate(splits):
 preds_val = np.concatenate(preds_val)[...,0]
 #y_val = np.concatenate(y_val).flatten()
 y_val = np.concatenate(y_val)
+print(preds_val.shape)
+print(y_val.shape)
 
 best_sarch_result = utils.threshold_search(y_val, preds_val)
 best_threshold = best_sarch_result['threshold']
@@ -128,9 +136,9 @@ print(f'best threshold: {best_threshold}')
 print(f'best validation score: {best_val_score}')
 
 testdata = VsbSignalDataset(mode='test')
-X_test = feature_extracter.feature_extracter('stats',
+X_test = feature_extracter.feature_extracter(features[0],
                                              testdata, window_size=window_size,
-                                             stride=stride, grouped=True, 
+                                             stride=stride, grouped=grouped, 
                                              normalizer=normalizer, use_cache=True)
 
 print(X_test.shape)

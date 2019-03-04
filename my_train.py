@@ -1,39 +1,40 @@
+import os 
+import numpy as np
+import random as rn
+# fix random seed
+os.environ['PYTHONHASHSEED'] = '0'
+np.random.seed(42)
+rn.seed(12345)
+import tensorflow as tf
+session_conf = tf.ConfigProto(intra_op_parallelism_threads=1, inter_op_parallelism_threads=1)
+tf.set_random_seed(1234)
+sess = tf.Session(graph=tf.get_default_graph(), config=session_conf)
+from keras import backend as K
+K.set_session(sess)
+import torch
+torch.manual_seed(2019)
+torch.cuda.manual_seed(2019)
+torch.cuda.manual_seed_all(2019)
+torch.backends.cudnn.deterministic = True
+
+
 import argparse
 from datetime import datetime
 import pandas as pd
 import pyarrow.parquet as pq
-import os 
-import numpy as np
 from keras.layers import *
-import tensorflow as tf
 from keras.models import Model
 from tqdm import tqdm
 from sklearn.model_selection import train_test_split 
-from keras import backend as K
 from keras import optimizers
 from sklearn.model_selection import GridSearchCV, StratifiedKFold
 from keras.callbacks import *
-import torch
 
 import utils
 from vsb_signal_dataset import VsbSignalDataset
 from normalizer import Normalizer
 import feature_extracter
 from models import modelutils
-
-# fix random seed
-os.environ['PYTHONHASHSEED'] = '0'
-np.random.seed(42)
-import random as rn
-rn.seed(12345)
-session_conf = tf.ConfigProto(intra_op_parallelism_threads=1, inter_op_parallelism_threads=1)
-tf.set_random_seed(1234)
-sess = tf.Session(graph=tf.get_default_graph(), config=session_conf)
-K.set_session(sess)
-torch.manual_seed(2019)
-torch.cuda.manual_seed(2019)
-torch.cuda.manual_seed_all(2019)
-torch.backends.cudnn.deterministic = True
 
 
 parser = argparse.ArgumentParser(description='vsb-power-line-fault-detection on kaggle')

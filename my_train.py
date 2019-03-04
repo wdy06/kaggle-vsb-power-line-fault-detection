@@ -43,6 +43,8 @@ parser.add_argument('--config', '-c', type=str, default='./config/base_config.js
                     help='path to config file')
 parser.add_argument("--debug", help="run debug mode",
                     action="store_true")
+parser.add_argument("--no_cache", help="extract feature without cache",
+                    action="store_true")
 args = parser.parse_args()
 
 if args.debug:
@@ -60,6 +62,7 @@ epoch = config['epoch']
 if args.debug:
     print('running debug mode')
     epoch = 5
+    N_SPLITS = 2
     
 batchsize = config['batch_size']
 sample_size = 800000
@@ -76,15 +79,19 @@ lr = config['lr']
 optimizer = config['optimizer']
 loss = config['loss']
 
+save_feature = False if args.debug else True
+use_cache = False if args.no_cache else True
+
 # dump config
 utils.save_config(config, os.path.join(result_dir, 'config.json'))
 
 dataset = VsbSignalDataset(mode='train', debug=args.debug)
 normalizer = Normalizer(min_num, max_num)
 
-X = feature_extracter.feature_extracter(features[0],
+X = feature_extracter.feature_extracter(features,
                                         dataset, window_size=window_size, stride=stride,
-                                        grouped=grouped, normalizer=normalizer, use_cache=True)
+                                        grouped=grouped, normalizer=normalizer, use_cache=use_cache,
+                                        save_result=save_feature)
 
 y = dataset.labels
 #y = y[::3].reshape(-1, 1)
@@ -96,10 +103,12 @@ np.save(os.path.join(result_dir, "y.npy"),X)
 
 
 #splits = list(StratifiedKFold(n_splits=N_SPLITS, shuffle=True, random_state=2019).split(X, y))
-#splits = dataset.get_folds(n_splits=N_SPLITS)
-adversarial_train_group = np.load('data/adversarial_train_group.npy')
-adversarial_val_group = np.load('data/adversarial_val_group.npy')
-splits = [(adversarial_train_group, adversarial_val_group)] * N_SPLITS
+if args.debug:
+    splits = dataset.get_folds(n_splits=N_SPLITS)
+else:
+    adversarial_train_group = np.load('data/adversarial_train_group.npy')
+    adversarial_val_group = np.load('data/adversarial_val_group.npy')
+    splits = [(adversarial_train_group, adversarial_val_group)] * N_SPLITS
 
 preds_val = []
 y_val = []
@@ -136,10 +145,11 @@ print(f'best threshold: {best_threshold}')
 print(f'best validation score: {best_val_score}')
 
 testdata = VsbSignalDataset(mode='test')
-X_test = feature_extracter.feature_extracter(features[0],
+X_test = feature_extracter.feature_extracter(features,
                                              testdata, window_size=window_size,
                                              stride=stride, grouped=grouped, 
-                                             normalizer=normalizer, use_cache=True)
+                                             normalizer=normalizer, use_cache=use_cache,
+                                             save_result=save_feature)
 
 print(X_test.shape)
 

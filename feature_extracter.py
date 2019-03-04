@@ -61,13 +61,16 @@ feature_funcs = {
     'window': window_extracter
 }
 
-def feature_extracter(feature_name, dataset, window_size, stride, grouped=False, normalizer=None, use_cache=True):
+def feature_extracter(feature_list, dataset, window_size, stride, grouped=False, normalizer=None, 
+                      use_cache=True, save_result=True):
+    print(f'feature list: {feature_list}')
+    _feature_string = '_'.join(feature_list)
     if grouped:
         cache_path \
-            = f'./features/X_{dataset.mode}_group_{feature_name}_w{window_size}_s{stride}.npy'
+            = f'./features/X_{dataset.mode}_group_{_feature_string}_w{window_size}_s{stride}.npy'
     else:
         cache_path \
-            = f'./features/X_{dataset.mode}_{feature_name}_w{window_size}_s{stride}.npy'
+            = f'./features/X_{dataset.mode}_{_feature_string}_w{window_size}_s{stride}.npy'
         
     if use_cache:
         print('use feature cache')
@@ -78,7 +81,6 @@ def feature_extracter(feature_name, dataset, window_size, stride, grouped=False,
             print('cache file cannot be find..')
             
     print('extracting feature ...')
-    extracter = feature_funcs[feature_name]
     divide_num = 12
     chunk_size = (len(dataset) // divide_num) * 3
     groups = np.unique(dataset.groups)
@@ -93,19 +95,25 @@ def feature_extracter(feature_name, dataset, window_size, stride, grouped=False,
             grouped_X = []
             for phase in [0, 1, 2]:
                 sig = signals[i*3+phase]
-                if normalizer is not None:
-                    feature = extracter(normalizer.ts_normalize(sig), window_size, stride)
-                else:
+                if normalizer:
+                    sig = normalizer.ts_normalize(sig)
+                
+                feature_X = []
+                for feature_name in feature_list:
+                    extracter = feature_funcs[feature_name]
                     feature = extracter(sig, window_size, stride)
+                    feature_X.append(feature)
+                feature_X = np.concatenate(feature_X, axis=1)
                 if grouped:
-                    grouped_X.append(feature)
+                    grouped_X.append(feature_X)
                 else:
-                    X.append(feature)
+                    X.append(feature_X)
             if grouped:
                 grouped_X = np.concatenate(grouped_X, axis=1)
                 X.append(grouped_X)
-                
-    np.save(cache_path, X)
+    if save_result:
+        print('save features!')
+        np.save(cache_path, X)
     return np.array(X)
 
 # def feature_extracter(extracter, dataset, window_size, stride, grouped=False, normalizer=None):

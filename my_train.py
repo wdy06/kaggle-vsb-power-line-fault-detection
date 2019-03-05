@@ -1,3 +1,4 @@
+import pyarrow.parquet as pq
 import os 
 import numpy as np
 import random as rn
@@ -22,7 +23,6 @@ torch.backends.cudnn.deterministic = True
 import argparse
 from datetime import datetime
 import pandas as pd
-import pyarrow.parquet as pq
 from keras.layers import *
 from keras.models import Model
 from tqdm import tqdm

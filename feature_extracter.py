@@ -89,24 +89,34 @@ def peak_feature_extracter(signal, window_size, stride):
             min_width_of_peak = np.min(widths[0])/100
             max_width_of_peak = np.max(widths[0])/100
             mean_width_of_peak = np.mean(widths[0])/100
-            std_width_of_peak = np.std(widths[0])/100
+            #std_width_of_peak = np.std(widths[0])/100
 
             min_height_of_peak = np.min(widths[1])
             max_height_of_peak = np.max(widths[1])
             mean_height_of_peak = np.mean(widths[1])
-            std_height_of_peak = np.std(widths[1])
+            #std_height_of_peak = np.std(widths[1])
 
             prominences = peak_prominences(ts_range, peaks)[0]
             min_prominence = np.min(prominences)
             max_prominence = np.max(prominences)
             mean_prominence = np.mean(prominences)
-            std_prominence = np.std(prominences)
+            #std_prominence = np.std(prominences)
         
         
-        feature.append(np.asarray([num_of_peaks, min_width_of_peak, max_width_of_peak, mean_width_of_peak,
-                                   std_width_of_peak, min_height_of_peak, max_height_of_peak, 
-                                   mean_height_of_peak, std_height_of_peak, min_prominence,
-                                   max_prominence, mean_prominence, std_prominence]))
+        feature.append(np.asarray([num_of_peaks, 
+                                   min_width_of_peak, 
+                                   max_width_of_peak, 
+                                   mean_width_of_peak,
+                                   #std_width_of_peak, 
+                                   min_height_of_peak, 
+                                   max_height_of_peak, 
+                                   mean_height_of_peak, 
+                                   #std_height_of_peak, 
+                                   min_prominence,
+                                   max_prominence, 
+                                   mean_prominence
+                                   #std_prominence
+                                  ]))
     return feature
 
 @jit('float32(float32[:], int32, int32)')
@@ -178,6 +188,8 @@ def feature_extracter(feature_list, dataset, window_size, stride, grouped=False,
     if save_result:
         print('save features!')
         np.save(cache_path, X)
+        
+    
     return np.array(X)
 
 # def feature_extracter(extracter, dataset, window_size, stride, grouped=False, normalizer=None):

@@ -17,6 +17,9 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import sys
 import os
+from scipy.signal import argrelmax, find_peaks, peak_widths, peak_prominences
+from scipy.stats import kurtosis, entropy, skew
+
 
 from sklearn.model_selection import train_test_split, StratifiedKFold
 
@@ -55,10 +58,73 @@ def time_feature_extracter(signal, window_size, stride):
         feature.append(np.concatenate([np.asarray([mean, std, std_top, std_bot, max_range]),percentil_calc, relative_percentile]))
     return feature
 
+@jit('float32(float32[:], int32, int32)')
+def peak_feature_extracter(signal, window_size, stride):
+    feature = []
+    for start in range(0, len(signal), stride):
+        if len(signal) < start+window_size:
+            break
+        ts_range = signal[start:start+window_size]
+        # calculate peak feature
+        peaks, _ = find_peaks(ts_range, threshold=0.05)
+        if len(peaks) == 0:
+            num_of_peaks = 0.
+            min_width_of_peak = 0.
+            max_width_of_peak = 0.
+            mean_width_of_peak = 0.
+            std_width_of_peak = 0.
+
+            min_height_of_peak = 0.
+            max_height_of_peak = 0.
+            mean_height_of_peak = 0.
+            std_height_of_peak = 0.
+
+            min_prominence = 0.
+            max_prominence = 0.
+            mean_prominence = 0.
+            std_prominence = 0.
+        else:
+            widths = peak_widths(ts_range, peaks, rel_height=0.5)
+            num_of_peaks = len(peaks)/len(ts_range)
+            min_width_of_peak = np.min(widths[0])/100
+            max_width_of_peak = np.max(widths[0])/100
+            mean_width_of_peak = np.mean(widths[0])/100
+            std_width_of_peak = np.std(widths[0])/100
+
+            min_height_of_peak = np.min(widths[1])
+            max_height_of_peak = np.max(widths[1])
+            mean_height_of_peak = np.mean(widths[1])
+            std_height_of_peak = np.std(widths[1])
+
+            prominences = peak_prominences(ts_range, peaks)[0]
+            min_prominence = np.min(prominences)
+            max_prominence = np.max(prominences)
+            mean_prominence = np.mean(prominences)
+            std_prominence = np.std(prominences)
+        
+        
+        feature.append(np.asarray([num_of_peaks, min_width_of_peak, max_width_of_peak, mean_width_of_peak,
+                                   std_width_of_peak, min_height_of_peak, max_height_of_peak, 
+                                   mean_height_of_peak, std_height_of_peak, min_prominence,
+                                   max_prominence, mean_prominence, std_prominence]))
+    return feature
+
+@jit('float32(float32[:], int32, int32)')
+def adv_stats_feature_extracter(signal, window_size, stride):
+    feature = []
+    for start in range(0, len(signal), stride):
+        if len(signal) < start+window_size:
+            break
+        ts_range = signal[start:start+window_size]
+        # calculate each feature
+        feature.append(np.asarray([kurtosis(ts_range), skew(ts_range)]))
+    return feature
 
 feature_funcs = {
     'stats': time_feature_extracter,
-    'window': window_extracter
+    'window': window_extracter,
+    'peak': peak_feature_extracter,
+    'adv_stats': adv_stats_feature_extracter
 }
 
 def feature_extracter(feature_list, dataset, window_size, stride, grouped=False, normalizer=None, 
@@ -83,10 +149,8 @@ def feature_extracter(feature_list, dataset, window_size, stride, grouped=False,
     print('extracting feature ...')
     divide_num = 12
     chunk_size = (len(dataset) // divide_num) * 3
-    groups = np.unique(dataset.groups)
     X = []
     for start_index in tqdm(range(0, len(dataset), chunk_size)):
-        
         if start_index+chunk_size<=len(dataset):
             signals = dataset[start_index:start_index+chunk_size]
         else:

@@ -189,20 +189,8 @@ def feature_extracter(feature_list, dataset, window_size, stride, grouped=False,
         print('save features!')
         np.save(cache_path, X)
         
-    
     return np.array(X)
 
-# def feature_extracter(extracter, dataset, window_size, stride, grouped=False, normalizer=None):
-#     divide_num = 6
-#     X = []
-#     for indices in tqdm(np.array_split(np.arange(len(dataset)), divide_num)):
-#         signals = dataset[indices]
-#         for sig in signals:
-#             if normalizer:
-#                 sig = normalizer.ts_normalize(sig)
-#             feature = extracter(sig, window_size, stride)
-#             X.append(feature)
-#     return np.array(X)
         
 
 

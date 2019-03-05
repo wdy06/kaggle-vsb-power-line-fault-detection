@@ -8,7 +8,7 @@ from keras.models import Sequential, Model
 
 from .attention import Attention
 
-def get_model(modelname, input_shape=None):
+def get_model(modelname, input_shape=None, n_outputs=1):
     if modelname == 'cnn_lstm':
         model = Sequential()
         model.add(TimeDistributed(Conv1D(filters=64, kernel_size=3, activation='relu'), input_shape=(None,n_length,n_signals)))
@@ -30,7 +30,7 @@ def get_model(modelname, input_shape=None):
         x = Bidirectional(CuDNNLSTM(64, return_sequences=True))(x)
         x = Attention(input_shape[1])(x)
         x = Dense(64, activation="relu")(x)
-        x = Dense(1, activation="sigmoid")(x)
+        x = Dense(n_outputs, activation="sigmoid")(x)
         model = Model(inputs=inp, outputs=x)
         
     else:

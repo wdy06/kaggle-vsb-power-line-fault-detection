@@ -75,7 +75,10 @@ class VsbSignalDataset():
         return self.metadata['signal_id'].values
     @property
     def labels(self):
-        return self.metadata['target'].values
+        if self.mode == 'train':
+            return self.metadata['target'].values
+        else:
+            return None
     
     @property
     def groups(self):

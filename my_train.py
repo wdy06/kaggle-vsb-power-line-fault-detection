@@ -78,6 +78,10 @@ features = config['features']
 lr = config['lr']
 optimizer = config['optimizer']
 loss = config['loss']
+if config['grouped']:
+    n_outputs = 3
+else:
+    n_outputs = 1
 
 save_feature = False if args.debug else True
 use_cache = False if args.no_cache else True
@@ -88,14 +92,10 @@ utils.save_config(config, os.path.join(result_dir, 'config.json'))
 dataset = VsbSignalDataset(mode='train', debug=args.debug)
 normalizer = Normalizer(min_num, max_num)
 
-X = feature_extracter.feature_extracter(features,
+X, y = feature_extracter.feature_extracter(features,
                                         dataset, window_size=window_size, stride=stride,
                                         grouped=grouped, normalizer=normalizer, use_cache=use_cache,
                                         save_result=save_feature)
-
-y = dataset.labels
-#y = y[::3].reshape(-1, 1)
-y = y[::3]
 
 print(X.shape, y.shape)
 np.save(os.path.join(result_dir, "X.npy"),X)
@@ -116,22 +116,23 @@ y_val = []
 for idx, (train_idx, val_idx) in enumerate(splits):
     print("Beginning fold {}".format(idx+1))
     train_X, train_y, val_X, val_y = X[train_idx], y[train_idx], X[val_idx], y[val_idx]
-    model = modelutils.get_model(model_name, train_X.shape)
+    model = modelutils.get_model(model_name, train_X.shape, n_outputs)
     ckpt = ModelCheckpoint(os.path.join(result_dir, f'weights_{idx}.h5'), save_best_only=True, save_weights_only=True, verbose=1, monitor='val_loss', mode='min')
-    reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=10,
+    reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=20,
                                    verbose=1, mode='min', epsilon=0.0001)
     early = EarlyStopping(monitor="val_loss",
                       mode="min",
-                      patience=25)
+                      patience=45)
     model.compile(loss=loss, optimizer=optimizer, metrics=[utils.matthews_correlation])
     K.set_value(model.optimizer.lr, lr)
-    model.fit(train_X, train_y, batch_size=batchsize, epochs=epoch, validation_data=[val_X, val_y], callbacks=[ckpt, reduce_lr, early])
+    history = model.fit(train_X, train_y, batch_size=batchsize, epochs=epoch, validation_data=[val_X, val_y], callbacks=[ckpt, reduce_lr, early])
     model.load_weights(os.path.join(result_dir, f'weights_{idx}.h5'))
-    preds_val.append(model.predict(val_X, batch_size=512))
-    y_val.append(val_y)
+    preds_val.append(model.predict(val_X, batch_size=512).flatten())
+    y_val.append(val_y.flatten())
 
 # concatenates all and prints the shape    
-preds_val = np.concatenate(preds_val)[...,0]
+preds_val = np.concatenate(preds_val)
+#preds_val = np.concatenate(preds_val)[...,0]
 #y_val = np.concatenate(y_val).flatten()
 y_val = np.concatenate(y_val)
 print(preds_val.shape)
@@ -145,7 +146,7 @@ print(f'best threshold: {best_threshold}')
 print(f'best validation score: {best_val_score}')
 
 testdata = VsbSignalDataset(mode='test')
-X_test = feature_extracter.feature_extracter(features,
+X_test, _ = feature_extracter.feature_extracter(features,
                                              testdata, window_size=window_size,
                                              stride=stride, grouped=grouped, 
                                              normalizer=normalizer, use_cache=use_cache,
@@ -165,11 +166,12 @@ for i in range(N_SPLITS):
     model.load_weights(model_path)
     pred = model.predict(X_test, batch_size=300, verbose=1)
     print(pred.shape)
-    pred_3 = []
-    for pred_scalar in pred:
-        for i in range(3):
-            pred_3.append(pred_scalar)
-    preds_test.append(pred_3)
+#     pred_3 = []
+#     for pred_scalar in pred:
+#         for i in range(3):
+#             pred_3.append(pred_scalar)
+#     preds_test.append(pred_3)
+    preds_test.append(pred.flatten())
 print(np.array(preds_test).shape)
 
 preds_test = (np.squeeze(np.mean(preds_test, axis=0)) > best_threshold).astype(np.int)

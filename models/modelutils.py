@@ -11,7 +11,7 @@ from .attention import Attention
 def get_model(modelname, input_shape=None, n_outputs=1):
     if modelname == 'cnn_lstm':
         model = Sequential()
-        model.add(TimeDistributed(Conv1D(filters=64, kernel_size=3, activation='relu'), input_shape=(None,n_length,n_signals)))
+        model.add(TimeDistributed(Conv1D(filters=64, kernel_size=3, activation='relu'), input_shape=(None,input_shape[1],input_shape[2])))
         model.add(TimeDistributed(Conv1D(filters=64, kernel_size=3, activation='relu')))
         model.add(TimeDistributed(Dropout(0.5)))
         model.add(TimeDistributed(MaxPooling1D(pool_size=2)))

@@ -108,7 +108,16 @@ if args.debug:
 else:
     adversarial_train_group = np.load('data/adversarial_train_group.npy')
     adversarial_val_group = np.load('data/adversarial_val_group.npy')
-    splits = [(adversarial_train_group, adversarial_val_group)] * N_SPLITS
+    if grouped:
+        splits = [(adversarial_train_group, adversarial_val_group)] * N_SPLITS
+    else:
+        train_signal_id = []
+        val_signal_id = []
+        for train_group_id in adversarial_train_group:
+            train_signal_id += list(dataset.groupid2signalid(train_group_id))
+        for val_group_id in adversarial_val_group:
+            val_signal_id += list(dataset.groupid2signalid(val_group_id))
+        splits = [(train_signal_id, val_signal_id)] * N_SPLITS
 
 preds_val = []
 y_val = []

@@ -11,15 +11,29 @@ from .attention import Attention
 def get_model(modelname, input_shape=None, n_outputs=1):
     if modelname == 'cnn_lstm':
         model = Sequential()
-        model.add(TimeDistributed(Conv1D(filters=64, kernel_size=3, activation='relu'), input_shape=(None,input_shape[1],input_shape[2])))
-        model.add(TimeDistributed(Conv1D(filters=64, kernel_size=3, activation='relu')))
-        model.add(TimeDistributed(Dropout(0.5)))
-        model.add(TimeDistributed(MaxPooling1D(pool_size=2)))
+        model.add(TimeDistributed(Conv1D(filters=16, kernel_size=32, strides=2, activation='relu'), input_shape=(None,input_shape[2], input_shape[3])))
+        model.add(TimeDistributed(Conv1D(filters=8, kernel_size=16, strides=2, activation='relu')))
+        model.add(TimeDistributed(Conv1D(filters=4, kernel_size=4, strides=2, activation='relu')))
+#         model.add(TimeDistributed(Dropout(0.5)))
+#         model.add(TimeDistributed(MaxPooling1D(pool_size=2)))
         model.add(TimeDistributed(Flatten()))
-        model.add(CuDNNLSTM(100))
+        model.add(CuDNNLSTM(32))
         model.add(Dropout(0.5))
-        model.add(Dense(100, activation='relu'))
+        model.add(Dense(32, activation='relu'))
         model.add(Dense(n_outputs, activation='sigmoid'))
+        
+#     elif modelname == 'wavenet':
+#         model = Sequential()
+#         model.add(AtrousConvolution1D(filters=16, kernel_size=2, atrous_rate=1, border_mode='same', activation='relu'), 
+#                                       input_shape=(None,input_shape[2], input_shape[3]))
+#         model.add(AtrousConvolution1D(filters=16, kernel_size=2, atrous_rate=2, 
+#                                       border_mode='same', activation='relu')
+#         model.add(AtrousConvolution1D(filters=16, kernel_size=2, atrous_rate=4, 
+#                                       border_mode='same', activation='relu')
+         
+#         model.add(Dropout(0.5))
+#         model.add(Dense(100, activation='relu'))
+#         model.add(Dense(n_outputs, activation='sigmoid'))
     
     elif modelname == 'bidirectional_lstm':
         if input_shape is None:
@@ -36,6 +50,7 @@ def get_model(modelname, input_shape=None, n_outputs=1):
     else:
         raise ValueError('unknown model name.')
         
+    model.summary()
     return model
             
             

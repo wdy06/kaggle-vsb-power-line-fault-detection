@@ -140,6 +140,9 @@ feature_funcs = {
 def feature_extracter(feature_list, dataset, window_size, stride, grouped=False, normalizer=None, 
                       use_cache=True, save_result=True):
     print(f'feature list: {feature_list}')
+    is_window_conv = False
+    if feature_list == ['window']:
+        is_window_conv = True
     _feature_string = '_'.join(feature_list)
     if grouped:
         cache_path \
@@ -181,9 +184,14 @@ def feature_extracter(feature_list, dataset, window_size, stride, grouped=False,
                     if grouped:
                         grouped_X.append(feature_X)
                     else:
+                        #print(feature_X.shape)
+                        if is_window_conv:
+                            n_steps = feature_X.shape[0]
+                            feature_X = feature_X.reshape(n_steps, -1, 1)
                         X.append(feature_X)
                 if grouped:
-                    grouped_X = np.concatenate(grouped_X, axis=1)
+                    if is_window_conv is False:
+                        grouped_X = np.concatenate(grouped_X, axis=1)
                     X.append(grouped_X)
         X = np.array(X)
                     

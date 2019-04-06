@@ -74,6 +74,8 @@ stride = config['stride']
 grouped = config['grouped']
 model_name = config['model_name']
 features = config['features']
+lstm_units = config['lstm_units']
+dense_units = config['dense_units']
 
 lr = config['lr']
 optimizer = config['optimizer']
@@ -125,7 +127,11 @@ y_val = []
 for idx, (train_idx, val_idx) in enumerate(splits):
     print("Beginning fold {}".format(idx+1))
     train_X, train_y, val_X, val_y = X[train_idx], y[train_idx], X[val_idx], y[val_idx]
-    model = modelutils.get_model(model_name, train_X.shape, n_outputs)
+    if lstm_units and dense_units:
+        model = modelutils.get_model(model_name, train_X.shape, n_outputs, lstm_units=lstm_units, dense_units=dense_units)
+    else:
+        model = modelutils.get_model(model_name, train_X.shape, n_outputs)
+        
     ckpt = ModelCheckpoint(os.path.join(result_dir, f'weights_{idx}.h5'), save_best_only=True, save_weights_only=True, verbose=1, monitor='val_loss', mode='min')
     reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=20,
                                    verbose=1, mode='min', epsilon=0.0001)
@@ -175,12 +181,12 @@ for i in range(N_SPLITS):
     model.load_weights(model_path)
     pred = model.predict(X_test, batch_size=300, verbose=1)
     print(pred.shape)
-#     pred_3 = []
-#     for pred_scalar in pred:
-#         for i in range(3):
-#             pred_3.append(pred_scalar)
-#     preds_test.append(pred_3)
-    preds_test.append(pred.flatten())
+    pred_3 = []
+    for pred_scalar in pred:
+        for i in range(3):
+            pred_3.append(pred_scalar)
+    preds_test.append(pred_3)
+    #preds_test.append(pred.flatten())
 print(np.array(preds_test).shape)
 
 preds_test = (np.squeeze(np.mean(preds_test, axis=0)) > best_threshold).astype(np.int)
